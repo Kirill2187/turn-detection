@@ -1,7 +1,8 @@
+import logging
 from pathlib import Path
+
 from huggingface_hub import snapshot_download
 from omegaconf import DictConfig
-import logging
 
 logger = logging.getLogger(__name__)
 

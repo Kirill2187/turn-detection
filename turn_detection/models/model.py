@@ -27,7 +27,7 @@ class EndpointClassifier(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         outputs = self(batch["input_ids"], batch["attention_mask"])
         loss = self.criterion(outputs, batch["labels"])
-        self.log("train_loss", loss)
+        self.log("train_loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -64,4 +64,8 @@ class EndpointClassifier(pl.LightningModule):
         return torch.argmax(outputs, dim=1)
 
     def configure_optimizers(self):
-        return AdamW(self.parameters(), lr=self.cfg.model.lr)
+        return AdamW(
+            self.parameters(),
+            lr=self.cfg.model.lr,
+            weight_decay=self.cfg.model.weight_decay,
+        )
