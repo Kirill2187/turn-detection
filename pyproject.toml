@@ -1,0 +1,59 @@
+[project]
+name = "turn-detection"
+version = "0.1.0"
+description = "Turn detection for voice bots"
+readme = "README.md"
+authors = [
+    { name = "Kirill Pupkov", email = "pupkovkirill@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.4.0",
+    "transformers>=4.57.3",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=3.0.0",
+    "ruff>=0.8.0",
+    "pytest>=7.0.0",
+    "mypy>=1.19.1",
+]
+
+[project.optional-dependencies]
+cpu = [
+    "torch>=2.9.1",
+]
+cuda = [
+    "torch>=2.9.1",
+]
+
+[[tool.uv.index]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-gpu", marker = "extra == 'cuda'" },
+    { index = "pytorch-cpu", marker = "extra != 'cuda'" },
+]
+torchvision = [
+    { index = "pytorch-gpu", marker = "extra == 'cuda'" },
+    { index = "pytorch-cpu", marker = "extra != 'cuda'" },
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+ignore_missing_imports = true
+explicit_package_bases = true
