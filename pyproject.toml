@@ -8,6 +8,9 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "datasets>=4.4.2",
+    "dvc>=3.65.0",
+    "dvc-gdrive>=3.0.1",
     "numpy>=2.4.0",
     "transformers>=4.57.3",
 ]
