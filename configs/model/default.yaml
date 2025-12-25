@@ -1,0 +1,4 @@
+name: "bert-classifier"
+model_name: "prajjwal1/bert-tiny"
+lr: 2e-5
+num_labels: 2

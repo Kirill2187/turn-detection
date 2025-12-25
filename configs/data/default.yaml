@@ -1,0 +1,7 @@
+data_path: "data/raw/custom_data"
+processed_path: "data/processed"
+
+batch_size: 64
+num_workers: 8
+train_val_split: 0.1
+max_length: 256
