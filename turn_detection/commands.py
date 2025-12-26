@@ -5,10 +5,13 @@ from pathlib import Path
 
 import fire
 import lightning as pl
-import matplotlib.pyplot as plt
 import torch
 from hydra import compose, initialize_config_dir
-from lightning.pytorch.callbacks import ModelCheckpoint, RichProgressBar
+from lightning.pytorch.callbacks import (
+    LearningRateMonitor,
+    ModelCheckpoint,
+    RichProgressBar,
+)
 from lightning.pytorch.loggers import MLFlowLogger
 from transformers import AutoTokenizer
 
@@ -30,19 +33,6 @@ def get_git_commit():
         return "unknown"
 
 
-def save_plots(trainer, output_dir="plots"):
-    Path(output_dir).mkdir(exist_ok=True)
-    metrics = trainer.callback_metrics
-    if not metrics:
-        return
-    plt.figure()
-    for key in ["val_loss", "val_acc", "val_f1", "val_roc_auc"]:
-        plt.plot([metrics[key].item()], label=key)
-    plt.legend()
-    plt.savefig(f"{output_dir}/metrics.png")
-    plt.close()
-
-
 def train(config_name="config", resume=None, experiment=None, **kwargs):
     config_path = str(Path(__file__).parent.parent / "configs")
     with initialize_config_dir(version_base=None, config_dir=config_path):
@@ -52,7 +42,6 @@ def train(config_name="config", resume=None, experiment=None, **kwargs):
         cfg = compose(config_name=config_name, overrides=override_list)
 
     pl.seed_everything(cfg.seed)
-    logging.basicConfig(level=logging.INFO)
 
     dm = EndpointDataModule(cfg)
     model = (
@@ -64,13 +53,21 @@ def train(config_name="config", resume=None, experiment=None, **kwargs):
     )
 
     logger = MLFlowLogger(
-        experiment_name=cfg.train.experiment_name, tracking_uri=cfg.train.mlflow_uri
+        experiment_name=cfg.train.experiment_name,
+        tracking_uri=cfg.train.mlflow_uri,
+        run_name=cfg.train.run_name,
     )
     logger.experiment.log_param(logger.run_id, "git_commit", get_git_commit())
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=cfg.train.ckpt_path, monitor="val_loss", mode="min", save_top_k=1
+        dirpath=cfg.train.ckpt_path,
+        monitor="val_roc_auc",
+        mode="max",
+        save_top_k=1,
+        filename="{step}-{val_roc_auc:.4f}",
     )
+
+    lr_monitor = LearningRateMonitor(logging_interval="step")
 
     trainer = pl.Trainer(
         max_steps=cfg.train.max_steps,
@@ -79,11 +76,10 @@ def train(config_name="config", resume=None, experiment=None, **kwargs):
         log_every_n_steps=cfg.train.log_every_n_steps,
         val_check_interval=cfg.train.val_check_interval,
         logger=logger,
-        callbacks=[checkpoint_callback, CustomProgressBar()],
+        callbacks=[checkpoint_callback, CustomProgressBar(), lr_monitor],
     )
 
     trainer.fit(model, dm, ckpt_path=resume)
-    save_plots(trainer)
 
 
 def export_onnx(checkpoint, output="model.onnx", config_name="config"):
@@ -153,6 +149,7 @@ def infer(input_path, checkpoint, output="predictions.json", config_name="config
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     fire.Fire({"train": train, "export_onnx": export_onnx, "infer": infer})
 
 

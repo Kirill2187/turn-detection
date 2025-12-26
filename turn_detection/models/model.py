@@ -17,6 +17,7 @@ from transformers import (
 class EndpointClassifier(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
+        self.save_hyperparameters()
         self.cfg = cfg
         self.model = AutoModelForSequenceClassification.from_pretrained(
             cfg.model.model_name, num_labels=2

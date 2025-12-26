@@ -11,4 +11,4 @@ mlflow_uri: http://127.0.0.1:8080
 experiment_name: turn-detection
 run_name: default-run
 
-ckpt_path: checkpoints/${run_name}
+ckpt_path: checkpoints/${.run_name}
