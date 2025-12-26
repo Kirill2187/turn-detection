@@ -58,7 +58,11 @@ def create_app(config_name="config", **kwargs):
             outputs=[output],
         )
 
-        logits = response.as_numpy("logits")[0]
+        assert response is not None  # for type checker
+        np_logits = response.as_numpy("logits")
+        assert np_logits is not None
+
+        logits = np_logits[0]
         probs = np.exp(logits) / np.exp(logits).sum()
 
         return InferResponse(probas={"wait": float(probs[0]), "speak": float(probs[1])})

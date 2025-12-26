@@ -153,13 +153,6 @@ class JSONLDataset(Dataset):
 
 class InferenceDataset(Dataset):
     def __init__(self, data: list[dict], tokenizer):
-        """
-        Dataset for inference without labels.
-
-        Args:
-            data: List of dicts with 'context' and 'message' keys
-            tokenizer: Tokenizer to encode the text
-        """
         self.data = data
         self.tokenizer = tokenizer
 
