@@ -16,10 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 class ChatDataset(Dataset):
-    def __init__(self, data_path: str, tokenizer, max_length: int = 512):
+    def __init__(self, data_path: str, tokenizer):
         self.samples: list[tuple[str, str, int]] = []
         self.tokenizer = tokenizer
-        self.max_length = max_length
         self._load_data(data_path)
 
     def _add_samples(self, context: str, full_msg: str):
@@ -59,8 +58,7 @@ class ChatDataset(Dataset):
             context,
             msg,
             add_special_tokens=True,
-            max_length=self.max_length,
-            truncation=True,
+            truncation=False,
             padding=False,
             return_tensors=None,
         )
@@ -72,26 +70,24 @@ class ChatDataset(Dataset):
         }
 
 
-class ConversationsDataset(Dataset):
+class JSONLDataset(Dataset):
     PUNCTUATION = set(punctuation)
 
     def __init__(
         self,
         data_path: str,
         tokenizer,
-        max_length: int = 512,
         max_lines: int | None = None,
     ):
         self.samples: list[tuple[str, str, int]] = []
         self.tokenizer = tokenizer
-        self.max_length = max_length
         self.max_lines = max_lines
         self._load_data(data_path)
 
     @staticmethod
     def _normalize_turn(turn: str) -> str:
         turn = turn.strip().lstrip("—").replace("-", " ").lower()
-        turn = "".join(c for c in turn if c not in ConversationsDataset.PUNCTUATION)
+        turn = "".join(c for c in turn if c not in JSONLDataset.PUNCTUATION)
         return turn.strip()
 
     def _load_data(self, path):
@@ -143,8 +139,7 @@ class ConversationsDataset(Dataset):
             context,
             msg,
             add_special_tokens=True,
-            max_length=self.max_length,
-            truncation=True,
+            truncation=False,
             padding=False,
             return_tensors=None,
         )
@@ -157,40 +152,38 @@ class ConversationsDataset(Dataset):
 
 
 class EndpointDataModule(pl.LightningDataModule):
-    def __init__(self, cfg, tokenizer_name: str):
+    def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
         self.train_ds = None
         self.val_ds = None
 
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(cfg.model.model_name)
         self.collator = DataCollatorWithPadding(
             tokenizer=self.tokenizer,
             padding=True,
             return_tensors="pt",
         )
 
+        self.type = self.cfg.data.type
+
     def setup(self, stage=None):
-        # full_ds = ChatDataset(
-        #     data_path=self.cfg.data.data_path,
-        #     tokenizer=self.tokenizer,
-        #     max_length=self.cfg.data.max_length,
-        # )
-
-        download_data(self.cfg)
-
-        full_ds = ConversationsDataset(
-            data_path=self.cfg.data.data_path,
-            tokenizer=self.tokenizer,
-            max_length=self.cfg.data.max_length,
-            max_lines=getattr(self.cfg.data, "max_lines", None),
-        )
+        if self.type == "chat":
+            full_ds = ChatDataset(
+                data_path=Path(self.cfg.data.data_raw_path)
+                / self.cfg.data.custom_data_folder,
+                tokenizer=self.tokenizer,
+            )
+        elif self.type == "jsonl":
+            download_data(self.cfg)
+            full_ds = JSONLDataset(
+                data_path=self.cfg.data.data_raw_path,
+                tokenizer=self.tokenizer,
+                max_lines=self.cfg.data.max_lines,
+            )
 
         val_size = int(self.cfg.data.train_val_split * len(full_ds))
-        val_size = min(
-            val_size,
-            getattr(self.cfg.data, "max_val_lines", val_size),
-        )
+        val_size = min(val_size, self.cfg.data.max_val_lines)
         train_size = len(full_ds) - val_size
 
         self.train_ds, self.val_ds = random_split(
@@ -220,7 +213,7 @@ class EndpointDataModule(pl.LightningDataModule):
         assert self.val_ds is not None
         return DataLoader(
             self.val_ds,
-            batch_size=self.cfg.data.batch_size,
+            batch_size=self.cfg.data.eval_batch_size,
             num_workers=self.cfg.data.num_workers,
             collate_fn=self.collator,
         )

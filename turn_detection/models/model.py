@@ -14,7 +14,6 @@ from transformers import AutoModelForSequenceClassification
 class EndpointClassifier(pl.LightningModule):
     def __init__(self, cfg):
         super().__init__()
-        self.save_hyperparameters()
         self.cfg = cfg
         self.model = AutoModelForSequenceClassification.from_pretrained(
             cfg.model.model_name, num_labels=2
@@ -38,9 +37,9 @@ class EndpointClassifier(pl.LightningModule):
         labels_cpu = batch["labels"].detach().cpu()
 
         acc = float(accuracy_score(labels_cpu, preds))
-        f1 = float(f1_score(labels_cpu, preds))
-        precision = float(precision_score(labels_cpu, preds))
-        recall = float(recall_score(labels_cpu, preds))
+        f1 = float(f1_score(labels_cpu, preds, zero_division=0))
+        precision = float(precision_score(labels_cpu, preds, zero_division=0))
+        recall = float(recall_score(labels_cpu, preds, zero_division=0))
 
         try:
             roc_auc = float(
@@ -57,6 +56,7 @@ class EndpointClassifier(pl.LightningModule):
         self.log("val_precision", precision)
         self.log("val_recall", recall)
         self.log("val_roc_auc", roc_auc)
+
         return loss
 
     def predict_step(self, batch, batch_idx):

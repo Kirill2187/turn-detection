@@ -23,7 +23,7 @@ def main(cfg: DictConfig):
 
     logging.basicConfig(level=logging.INFO)
 
-    dm = EndpointDataModule(cfg, tokenizer_name=cfg.model.model_name)
+    dm = EndpointDataModule(cfg)
     model = EndpointClassifier(cfg)
 
     if cfg.task == "train":

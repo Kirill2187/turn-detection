@@ -2,17 +2,15 @@
 
 defaults:
   - override /data: default
-  - override /model: default
+  - override /model: rubert
   - override /train: default
-
-model:
-  model_name: deepvk/RuModernBERT-base
-  lr: 1e-5
 
 data:
   batch_size: 32
+  eval_batch_size: 64
 
 train:
   max_epochs: 1
   accelerator: "cuda"
   devices: [0]
+  run_name: rubert-run

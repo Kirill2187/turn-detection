@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def download_data(cfg):
-    raw_path = Path(cfg.data.data_path)
+    raw_path = Path(cfg.data.data_raw_path)
     raw_path.mkdir(parents=True, exist_ok=True)
 
     target_file = raw_path / "conversations.jsonl"

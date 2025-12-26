@@ -1,10 +1,13 @@
 max_epochs: 1
-accelerator: "cpu"
+accelerator: cpu
 devices: 1
 
-log_every_n_steps: 1
+log_every_n_steps: 10
 val_check_interval: 500
 
-mlflow_uri: "http://127.0.0.1:8080"
-experiment_name: "mvp"
-ckpt_path: "checkpoints/"
+mlflow_uri: http://127.0.0.1:8080
+
+experiment_name: turn-detection
+run_name: default-run
+
+ckpt_path: checkpoints/${run_name}
