@@ -38,12 +38,16 @@ def create_app(config_name="config", **kwargs):
             request.message,
             return_tensors="np",
             padding="max_length",
-            max_length=512,
+            max_length=cfg.serve.max_length,
             truncation=True,
         )
 
-        input_ids = grpcclient.InferInput("input_ids", [1, 512], "INT64")
-        attention_mask = grpcclient.InferInput("attention_mask", [1, 512], "INT64")
+        input_ids = grpcclient.InferInput(
+            "input_ids", [1, cfg.serve.max_length], "INT64"
+        )
+        attention_mask = grpcclient.InferInput(
+            "attention_mask", [1, cfg.serve.max_length], "INT64"
+        )
         input_ids.set_data_from_numpy(inputs["input_ids"].astype(np.int64))
         attention_mask.set_data_from_numpy(inputs["attention_mask"].astype(np.int64))
 

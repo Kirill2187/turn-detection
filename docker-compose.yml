@@ -1,0 +1,15 @@
+services:
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.12-py3
+    ports:
+      - 8000-8002:8000-8002
+    volumes:
+      - ./models:/models
+    command: tritonserver --model-repository=/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
