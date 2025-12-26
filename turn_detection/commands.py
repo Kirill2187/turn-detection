@@ -43,6 +43,7 @@ def train(cfg, dm, model):
         accelerator=cfg.train.accelerator,
         devices=cfg.train.devices,
         log_every_n_steps=cfg.train.log_every_n_steps,
+        val_check_interval=cfg.train.val_check_interval,
         logger=logger,
         callbacks=[checkpoint_callback, CustomProgressBar()],
     )

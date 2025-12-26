@@ -1,0 +1,18 @@
+# @package _global_
+
+defaults:
+  - override /data: default
+  - override /model: default
+  - override /train: default
+
+model:
+  model_name: deepvk/RuModernBERT-base
+  lr: 1e-5
+
+data:
+  batch_size: 32
+
+train:
+  max_epochs: 1
+  accelerator: "cuda"
+  devices: [0]

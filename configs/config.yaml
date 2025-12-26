@@ -4,6 +4,5 @@ defaults:
   - train: default
   - _self_
 
-project_name: "turn_detection"
 seed: 42
-task: "train"
+task: train
