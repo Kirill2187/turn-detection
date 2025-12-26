@@ -1,9 +1,7 @@
 # @package _global_
 
 defaults:
-  - override /data: default
   - override /model: rubert
-  - override /train: default
 
 data:
   batch_size: 32
@@ -11,8 +9,7 @@ data:
 
 train:
   max_steps: 10000
-  warmup_steps: 50
-
-  accelerator: "cuda"
-  devices: [0]
+  warmup_steps: 500
+  accelerator: cuda
+  devices: 1
   run_name: rubert-run

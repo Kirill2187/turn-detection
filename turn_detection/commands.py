@@ -43,10 +43,12 @@ def save_plots(trainer, output_dir="plots"):
     plt.close()
 
 
-def train(config_name="config", resume=None, **overrides):
+def train(config_name="config", resume=None, experiment=None, **kwargs):
     config_path = str(Path(__file__).parent.parent / "configs")
     with initialize_config_dir(version_base=None, config_dir=config_path):
-        override_list = [f"{k}={v}" for k, v in overrides.items()]
+        override_list = [f"{k}={v}" for k, v in kwargs.items()]
+        if experiment:
+            override_list = [f"+experiment={experiment}"] + override_list
         cfg = compose(config_name=config_name, overrides=override_list)
 
     pl.seed_everything(cfg.seed)
@@ -56,7 +58,9 @@ def train(config_name="config", resume=None, **overrides):
     model = (
         EndpointClassifier(cfg)
         if not resume
-        else EndpointClassifier.load_from_checkpoint(resume, cfg=cfg)
+        else EndpointClassifier.load_from_checkpoint(
+            resume, cfg=cfg, weights_only=False
+        )
     )
 
     logger = MLFlowLogger(

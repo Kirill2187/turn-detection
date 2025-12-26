@@ -5,4 +5,3 @@ defaults:
   - _self_
 
 seed: 42
-task: train
