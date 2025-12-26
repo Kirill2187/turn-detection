@@ -119,8 +119,6 @@ def export_onnx(checkpoint, output="model.onnx", config_name="config", **kwargs)
         external_data=False,
     )
 
-    print(f"Model exported to {output}")
-
 
 def infer(
     input_path, checkpoint, output="predictions.json", config_name="config", **kwargs
@@ -135,7 +133,7 @@ def infer(
         data = json.load(f)
 
     model = EndpointClassifier.load_from_checkpoint(
-        checkpoint, cfg=cfg, map_location="cpu"
+        checkpoint, cfg=cfg, map_location="cpu", weights_only=False
     )
     dm = EndpointDataModule(cfg, predict_data=data)
     trainer = pl.Trainer(
@@ -157,8 +155,6 @@ def infer(
 
     with open(output, "w") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
-
-    print(f"Predictions saved to {output}")
 
 
 def main():
