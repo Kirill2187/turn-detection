@@ -28,7 +28,11 @@ class CustomProgressBar(RichProgressBar):
 
 def get_git_commit():
     try:
-        return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+        return (
+            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+            .decode()
+            .strip()
+        )
     except Exception:
         return "unknown"
 
@@ -82,31 +86,39 @@ def train(config_name="config", resume=None, experiment=None, **kwargs):
     trainer.fit(model, dm, ckpt_path=resume)
 
 
-def export_onnx(checkpoint, output="model.onnx", config_name="config"):
+def export_onnx(checkpoint, output="model.onnx", config_name="config", **kwargs):
     config_path = str(Path(__file__).parent.parent / "configs")
     with initialize_config_dir(version_base=None, config_dir=config_path):
-        cfg = compose(config_name=config_name)
+        override_list = [f"{k}={v}" for k, v in kwargs.items()]
+        cfg = compose(config_name=config_name, overrides=override_list)
 
-    model = EndpointClassifier.load_from_checkpoint(checkpoint, cfg=cfg)
+    model = EndpointClassifier.load_from_checkpoint(
+        checkpoint, weights_only=False, cfg=cfg, map_location="cpu"
+    )
     model.eval()
 
-    dummy_input = (
-        torch.randint(0, 1000, (1, 128)),
-        torch.ones(1, 128, dtype=torch.long),
-    )
+    tokenizer = AutoTokenizer.from_pretrained(cfg.model.model_name)
+    dummy_text = "lorem ipsum dolor sit amet"
+    dummy_input = tokenizer(dummy_text, return_tensors="pt")
+
+    input_ids = dummy_input["input_ids"]
+    attention_mask = dummy_input["attention_mask"]
+
     torch.onnx.export(
         model,
-        dummy_input,
+        (input_ids, attention_mask),
         output,
         input_names=["input_ids", "attention_mask"],
         output_names=["logits"],
         dynamic_axes={
-            "input_ids": {0: "batch", 1: "seq"},
-            "attention_mask": {0: "batch", 1: "seq"},
-            "logits": {0: "batch"},
+            "input_ids": {0: "batch_size", 1: "sequence_length"},
+            "attention_mask": {0: "batch_size", 1: "sequence_length"},
+            "logits": {0: "batch_size"},
         },
-        opset_version=14,
+        opset_version=18,
+        external_data=False,
     )
+
     print(f"Model exported to {output}")
 
 

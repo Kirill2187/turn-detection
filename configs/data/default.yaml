@@ -11,4 +11,4 @@ num_workers: 8
 train_val_split: 0.1
 
 max_lines: 100000
-max_val_lines: 1000
+max_val_lines: 10000
