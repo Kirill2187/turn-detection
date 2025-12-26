@@ -1,4 +1,5 @@
-max_epochs: 1
+max_steps: 1000
+warmup_steps: 100
 accelerator: cpu
 devices: 1
 

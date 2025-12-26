@@ -8,7 +8,10 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from torch.optim import AdamW
-from transformers import AutoModelForSequenceClassification
+from transformers import (
+    AutoModelForSequenceClassification,
+    get_linear_schedule_with_warmup,
+)
 
 
 class EndpointClassifier(pl.LightningModule):
@@ -18,6 +21,11 @@ class EndpointClassifier(pl.LightningModule):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             cfg.model.model_name, num_labels=2
         ).train()
+
+        if cfg.model.freeze_base:
+            for param in self.model.base_model.parameters():
+                param.requires_grad = False
+
         self.criterion = torch.nn.CrossEntropyLoss()
 
     def forward(self, input_ids, attention_mask):
@@ -64,8 +72,17 @@ class EndpointClassifier(pl.LightningModule):
         return torch.argmax(outputs, dim=1)
 
     def configure_optimizers(self):
-        return AdamW(
+        optimizer = AdamW(
             self.parameters(),
             lr=self.cfg.model.lr,
             weight_decay=self.cfg.model.weight_decay,
         )
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=self.cfg.train.warmup_steps,
+            num_training_steps=self.cfg.train.max_steps,
+        )
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {"scheduler": scheduler, "interval": "step"},
+        }

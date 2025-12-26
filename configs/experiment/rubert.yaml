@@ -10,7 +10,9 @@ data:
   eval_batch_size: 64
 
 train:
-  max_epochs: 1
+  max_steps: 10000
+  warmup_steps: 50
+
   accelerator: "cuda"
   devices: [0]
   run_name: rubert-run

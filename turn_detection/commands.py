@@ -1,10 +1,16 @@
+import json
 import logging
+import subprocess
+from pathlib import Path
 
-import hydra
+import fire
 import lightning as pl
+import matplotlib.pyplot as plt
+import torch
+from hydra import compose, initialize_config_dir
 from lightning.pytorch.callbacks import ModelCheckpoint, RichProgressBar
 from lightning.pytorch.loggers import MLFlowLogger
-from omegaconf import DictConfig
+from transformers import AutoTokenizer
 
 from .data import EndpointDataModule
 from .models import EndpointClassifier
@@ -17,29 +23,53 @@ class CustomProgressBar(RichProgressBar):
         return items
 
 
-@hydra.main(version_base=None, config_path="../configs", config_name="config")
-def main(cfg: DictConfig):
-    pl.seed_everything(cfg.seed)
+def get_git_commit():
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode().strip()
+    except Exception:
+        return "unknown"
 
+
+def save_plots(trainer, output_dir="plots"):
+    Path(output_dir).mkdir(exist_ok=True)
+    metrics = trainer.callback_metrics
+    if not metrics:
+        return
+    plt.figure()
+    for key in ["val_loss", "val_acc", "val_f1", "val_roc_auc"]:
+        plt.plot([metrics[key].item()], label=key)
+    plt.legend()
+    plt.savefig(f"{output_dir}/metrics.png")
+    plt.close()
+
+
+def train(config_name="config", resume=None, **overrides):
+    config_path = str(Path(__file__).parent.parent / "configs")
+    with initialize_config_dir(version_base=None, config_dir=config_path):
+        override_list = [f"{k}={v}" for k, v in overrides.items()]
+        cfg = compose(config_name=config_name, overrides=override_list)
+
+    pl.seed_everything(cfg.seed)
     logging.basicConfig(level=logging.INFO)
 
     dm = EndpointDataModule(cfg)
-    model = EndpointClassifier(cfg)
+    model = (
+        EndpointClassifier(cfg)
+        if not resume
+        else EndpointClassifier.load_from_checkpoint(resume, cfg=cfg)
+    )
 
-    if cfg.task == "train":
-        train(cfg, dm, model)
-
-
-def train(cfg, dm, model):
     logger = MLFlowLogger(
         experiment_name=cfg.train.experiment_name, tracking_uri=cfg.train.mlflow_uri
     )
+    logger.experiment.log_param(logger.run_id, "git_commit", get_git_commit())
+
     checkpoint_callback = ModelCheckpoint(
-        dirpath=cfg.train.ckpt_path, monitor="val_loss", mode="min"
+        dirpath=cfg.train.ckpt_path, monitor="val_loss", mode="min", save_top_k=1
     )
 
     trainer = pl.Trainer(
-        max_epochs=cfg.train.max_epochs,
+        max_steps=cfg.train.max_steps,
         accelerator=cfg.train.accelerator,
         devices=cfg.train.devices,
         log_every_n_steps=cfg.train.log_every_n_steps,
@@ -48,7 +78,78 @@ def train(cfg, dm, model):
         callbacks=[checkpoint_callback, CustomProgressBar()],
     )
 
-    trainer.fit(model, dm)
+    trainer.fit(model, dm, ckpt_path=resume)
+    save_plots(trainer)
+
+
+def export_onnx(checkpoint, output="model.onnx", config_name="config"):
+    config_path = str(Path(__file__).parent.parent / "configs")
+    with initialize_config_dir(version_base=None, config_dir=config_path):
+        cfg = compose(config_name=config_name)
+
+    model = EndpointClassifier.load_from_checkpoint(checkpoint, cfg=cfg)
+    model.eval()
+
+    dummy_input = (
+        torch.randint(0, 1000, (1, 128)),
+        torch.ones(1, 128, dtype=torch.long),
+    )
+    torch.onnx.export(
+        model,
+        dummy_input,
+        output,
+        input_names=["input_ids", "attention_mask"],
+        output_names=["logits"],
+        dynamic_axes={
+            "input_ids": {0: "batch", 1: "seq"},
+            "attention_mask": {0: "batch", 1: "seq"},
+            "logits": {0: "batch"},
+        },
+        opset_version=14,
+    )
+    print(f"Model exported to {output}")
+
+
+def infer(input_path, checkpoint, output="predictions.json", config_name="config"):
+    config_path = str(Path(__file__).parent.parent / "configs")
+    with initialize_config_dir(version_base=None, config_dir=config_path):
+        cfg = compose(config_name=config_name)
+
+    model = EndpointClassifier.load_from_checkpoint(checkpoint, cfg=cfg)
+    model.eval()
+
+    tokenizer = AutoTokenizer.from_pretrained(cfg.model.model_name)
+
+    with open(input_path) as f:
+        data = json.load(f)
+
+    results = []
+    for item in data:
+        inputs = tokenizer(
+            item["context"],
+            item["message"],
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        with torch.no_grad():
+            logits = model(inputs["input_ids"], inputs["attention_mask"])
+            probs = torch.softmax(logits, dim=1)[0]
+        results.append(
+            {
+                **item,
+                "prediction": "speak" if probs[1] > probs[0] else "wait",
+                "probabilities": {"wait": float(probs[0]), "speak": float(probs[1])},
+            }
+        )
+
+    with open(output, "w") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+    print(f"Predictions saved to {output}")
+
+
+def main():
+    fire.Fire({"train": train, "export_onnx": export_onnx, "infer": infer})
 
 
 if __name__ == "__main__":

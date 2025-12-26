@@ -2,3 +2,4 @@ model_name: prajjwal1/bert-tiny # tiny model for testing
 
 lr: 3e-4
 weight_decay: 0.01
+freeze_base: false
