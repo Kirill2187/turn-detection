@@ -151,12 +151,46 @@ class JSONLDataset(Dataset):
         }
 
 
+class InferenceDataset(Dataset):
+    def __init__(self, data: list[dict], tokenizer):
+        """
+        Dataset for inference without labels.
+
+        Args:
+            data: List of dicts with 'context' and 'message' keys
+            tokenizer: Tokenizer to encode the text
+        """
+        self.data = data
+        self.tokenizer = tokenizer
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        item = self.data[index]
+        encoding = self.tokenizer(
+            item["context"],
+            item["message"],
+            add_special_tokens=True,
+            truncation=True,
+            padding=False,
+            return_tensors=None,
+        )
+
+        return {
+            "input_ids": encoding["input_ids"],
+            "attention_mask": encoding["attention_mask"],
+        }
+
+
 class EndpointDataModule(pl.LightningDataModule):
-    def __init__(self, cfg):
+    def __init__(self, cfg, predict_data=None):
         super().__init__()
         self.cfg = cfg
         self.train_ds = None
         self.val_ds = None
+        self.predict_ds = None
+        self.predict_data = predict_data
 
         self.tokenizer = AutoTokenizer.from_pretrained(cfg.model.model_name)
         self.collator = DataCollatorWithPadding(
@@ -168,6 +202,11 @@ class EndpointDataModule(pl.LightningDataModule):
         self.type = self.cfg.data.type
 
     def setup(self, stage=None):
+        if stage == "predict":
+            if self.predict_data is not None:
+                self.predict_ds = InferenceDataset(self.predict_data, self.tokenizer)
+            return
+
         if self.type == "chat":
             full_ds = ChatDataset(
                 data_path=Path(self.cfg.data.data_raw_path)
@@ -216,4 +255,13 @@ class EndpointDataModule(pl.LightningDataModule):
             batch_size=self.cfg.data.eval_batch_size,
             num_workers=self.cfg.data.num_workers,
             collate_fn=self.collator,
+        )
+
+    def predict_dataloader(self):
+        assert self.predict_ds is not None
+        return DataLoader(
+            self.predict_ds,
+            batch_size=self.cfg.infer.batch_size,
+            collate_fn=self.collator,
+            num_workers=0,
         )

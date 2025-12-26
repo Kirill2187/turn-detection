@@ -2,6 +2,7 @@ defaults:
   - data: default
   - model: default
   - train: default
+  - infer: default
   - _self_
 
 seed: 42

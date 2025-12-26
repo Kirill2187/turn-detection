@@ -122,41 +122,42 @@ def export_onnx(checkpoint, output="model.onnx", config_name="config", **kwargs)
     print(f"Model exported to {output}")
 
 
-def infer(input_path, checkpoint, output="predictions.json", config_name="config"):
+def infer(
+    input_path, checkpoint, output="predictions.json", config_name="config", **kwargs
+):
     config_path = str(Path(__file__).parent.parent / "configs")
     with initialize_config_dir(version_base=None, config_dir=config_path):
-        cfg = compose(config_name=config_name)
-
-    model = EndpointClassifier.load_from_checkpoint(checkpoint, cfg=cfg)
-    model.eval()
-
-    tokenizer = AutoTokenizer.from_pretrained(cfg.model.model_name)
+        cfg = compose(
+            config_name=config_name, overrides=[f"{k}={v}" for k, v in kwargs.items()]
+        )
 
     with open(input_path) as f:
         data = json.load(f)
 
-    results = []
-    for item in data:
-        inputs = tokenizer(
-            item["context"],
-            item["message"],
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-        )
-        with torch.no_grad():
-            logits = model(inputs["input_ids"], inputs["attention_mask"])
-            probs = torch.softmax(logits, dim=1)[0]
-        results.append(
-            {
-                **item,
-                "prediction": "speak" if probs[1] > probs[0] else "wait",
-                "probabilities": {"wait": float(probs[0]), "speak": float(probs[1])},
-            }
-        )
+    model = EndpointClassifier.load_from_checkpoint(
+        checkpoint, cfg=cfg, map_location="cpu"
+    )
+    dm = EndpointDataModule(cfg, predict_data=data)
+    trainer = pl.Trainer(
+        accelerator=cfg.infer.accelerator, devices=cfg.infer.devices, logger=False
+    )
+
+    predictions = trainer.predict(model, dm)
+    assert predictions is not None
+
+    probs_list = [probs.cpu() for batch in predictions for probs in batch]
+
+    results = [
+        {
+            **item,
+            "probas": {"wait": float(p[0]), "speak": float(p[1])},
+        }
+        for item, p in zip(data, probs_list)
+    ]
 
     with open(output, "w") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
+
     print(f"Predictions saved to {output}")
 
 

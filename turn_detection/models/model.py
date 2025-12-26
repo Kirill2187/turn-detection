@@ -70,7 +70,7 @@ class EndpointClassifier(pl.LightningModule):
 
     def predict_step(self, batch, batch_idx):
         outputs = self(batch["input_ids"], batch["attention_mask"])
-        return torch.argmax(outputs, dim=1)
+        return torch.softmax(outputs, dim=1)
 
     def configure_optimizers(self):
         optimizer = AdamW(
