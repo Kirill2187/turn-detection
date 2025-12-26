@@ -21,6 +21,10 @@
 
 на отложенной выборке из того же датасета.
 
+<img src="plots/train_loss.png" alt="Train Loss" width="32%">
+<img src="plots/val_loss.png" alt="Val Loss" width="32%">
+<img src="plots/val_roc_auc.png" alt="Val ROC-AUC" width="32%">
+
 ## Setup
 
 ### Установка
