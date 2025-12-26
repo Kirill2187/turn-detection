@@ -3,6 +3,7 @@ defaults:
   - model: default
   - train: default
   - infer: default
+  - serve: default
   - _self_
 
 seed: 42

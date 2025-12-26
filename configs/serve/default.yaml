@@ -1,0 +1,6 @@
+triton_url: localhost:8001
+triton_model_name: turn_detection
+tokenizer: deepvk/RuModernBERT-base
+
+api_host: 0.0.0.0
+api_port: 8080

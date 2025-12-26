@@ -1,0 +1,8 @@
+name: "turn_detection"
+platform: "tensorrt_plan"
+max_batch_size: 32
+input [
+  { name: "input_ids", data_type: TYPE_INT64, dims: [512] },
+  { name: "attention_mask", data_type: TYPE_INT64, dims: [512] }
+]
+output [ { name: "logits", data_type: TYPE_FP32, dims: [2] } ]
